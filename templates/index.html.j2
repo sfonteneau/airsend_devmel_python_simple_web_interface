@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contrôle des volets roulants</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <style>
+        .collection-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .buttons a {
+            flex-basis: 150px;
+        }
+        .navbar {
+            background-color: #f5f5f5;
+            padding: 10px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 999;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar .brand-logo {
+            margin-left: 20px;
+        }
+        .navbar ul {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: flex-end;
+            list-style: none;
+            align-items: center;
+        }
+        .navbar ul li {
+            margin: 0;
+        }
+        .navbar ul li a {
+            display: block;
+            padding: 10px;
+        }
+        .main-content {
+            margin-top: 70px;
+        }
+        @media (max-width: 600px) {
+            .buttons a {
+                flex-basis: 100%;
+                margin-bottom: 10px;
+            }
+            .navbar ul {
+                flex-direction: column;
+                display: none;
+            }
+            .navbar ul.show {
+                display: flex;
+            }
+            .navbar ul li {
+                margin-bottom: 10px;
+            }
+            .navbar .menu-icon {
+                display: block;
+                padding: 10px;
+            }
+            .main-content {
+                margin-top: 140px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <ul id="menu" class="">
+            <li><a href="/individuel">Individuel</a></li>
+            <li><a href="/">Groupe</a></li>
+        </ul>
+        <a href="#" class="menu-icon" onclick="toggleMenu()">&#9776;</a>
+    </div>
+
+    <div class="container main-content">
+       <!-- <h1>Contrôle des volets roulants</h1> -->
+        {% for entry in datajson %}
+        <ul class="collection">
+            <li class="collection-item">
+                <h4>{{ entry['name'] }}</h4>
+                <div class="buttons">
+                    <a class="waves-effect waves-light btn" onclick="sendCommand('{{ entry['name'] }}', 'UP')"><i class="material-icons left">arrow_upward</i>Haut</a>
+                    <a class="waves-effect waves-light btn" onclick="sendCommand('{{ entry['name'] }}', 'DOWN')"><i class="material-icons left">arrow_downward</i>Bas</a>
+                    <a class="waves-effect waves-light btn red" onclick="sendCommand('{{ entry['name'] }}', 'STOP')"><i class="material-icons left">stop</i>Stop</a>
+                    <a class="waves-effect waves-light btn orange" onclick="sendCommand('{{ entry['name'] }}', 'USERPOSITION')"><i class="material-icons left">pause</i>Position intermédiaire</a>
+                </div>
+            </li>
+        </ul>
+        {% endfor %}
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        function sendCommand(voletId, action) {
+            var command = {
+                voletId: voletId,
+                action: action
+            };
+            var url = '/api/action';
+            var options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(command)
+            };
+            fetch(url, options)
+                .then(response => {
+                    if (response.ok) {
+                        console.log('Command sent successfully');
+                    } else {
+                        console.error('Failed to send command');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function toggleMenu() {
+            var menu = document.getElementById('menu');
+            menu.classList.toggle('show');
+        }
+
+        window.addEventListener('resize', function() {
+            var menu = document.getElementById('menu');
+            var menuIcon = document.querySelector('.menu-icon');
+            if (window.innerWidth > 600) {
+                menu.classList.remove('show');
+                menuIcon.style.display = 'none';
+            } else {
+                menuIcon.style.display = 'block';
+            }
+        });
+
+        window.addEventListener('load', function() {
+            var menu = document.getElementById('menu');
+            var menuIcon = document.querySelector('.menu-icon');
+            if (window.innerWidth <= 600) {
+                menuIcon.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,4 @@
+[global]
+ip_airsend = 192.168.1.10
+password_airsend = password
+airsendwebservice = http://127.0.0.1:33863
