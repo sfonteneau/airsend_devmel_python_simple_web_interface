@@ -3,7 +3,7 @@ After=network.target
 
 [Service]
 User=root
-ExecStart=/usr/bin/python3 /opt/domo/web.py
+ExecStart=/usr/bin/python3 /opt/domotique/web.py
 Restart=on-failure
 SuccessExitStatus=3 4
 RestartForceExitStatus=3 4
