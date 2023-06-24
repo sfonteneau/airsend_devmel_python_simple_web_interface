@@ -27,7 +27,7 @@ password_airsend = inifile.get('global', 'password_airsend')
 airsendwebservice = inifile.get('global', 'airsendwebservice')
 
 @app.route("/individuel")
-def index():
+def individuel():
     return render_template("index.html.j2",datajson=datajson)
 
 @app.route("/")
