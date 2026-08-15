@@ -18,3 +18,5 @@ Temperature
 * Support for Atlantic Navilink A59 NB temperature sensors
 * Ambient and requested temperatures are stored in SQLite
 * Temperature history is available from the web interface
+
+* The history page can use preset periods or a custom inclusive date range (start/end).

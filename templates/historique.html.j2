@@ -161,6 +161,54 @@
         }
 
 
+        .date-range-control {
+
+            display: none;
+
+            min-width: 390px;
+        }
+
+
+        .date-range-control.active {
+
+            display: block;
+        }
+
+
+        .date-range-fields {
+
+            display: flex;
+
+            gap: 12px;
+        }
+
+
+        .date-field {
+
+            flex: 1;
+
+            min-width: 150px;
+        }
+
+
+        .date-field input[type="date"] {
+
+            box-sizing: border-box;
+
+            height: 40px;
+
+            margin: 0;
+
+            padding: 0 8px;
+
+            border: 1px solid #bbb;
+
+            border-radius: 2px;
+
+            background: white;
+        }
+
+
         .loading {
 
             display: none;
@@ -336,6 +384,24 @@
             .control {
 
                 margin-bottom: 15px;
+            }
+
+
+            .date-range-control {
+
+                min-width: 0;
+            }
+
+
+            .date-range-fields {
+
+                display: block;
+            }
+
+
+            .date-field {
+
+                margin-bottom: 10px;
             }
 
 
@@ -522,7 +588,53 @@
                         1 an
                     </option>
 
+
+                    <option value="custom">
+                        Plage de dates
+                    </option>
+
                 </select>
+
+            </div>
+
+
+            <!-- Plage de dates personnalisée -->
+
+            <div
+                id="dateRangeControl"
+                class="control date-range-control"
+            >
+
+                <div class="date-range-fields">
+
+                    <div class="date-field">
+
+                        <label for="startDate">
+                            Du
+                        </label>
+
+                        <input
+                            id="startDate"
+                            type="date"
+                        >
+
+                    </div>
+
+
+                    <div class="date-field">
+
+                        <label for="endDate">
+                            Au
+                        </label>
+
+                        <input
+                            id="endDate"
+                            type="date"
+                        >
+
+                    </div>
+
+                </div>
 
             </div>
 
@@ -691,6 +803,24 @@
         const periodSelect =
             document.getElementById(
                 "period"
+            );
+
+
+        const dateRangeControl =
+            document.getElementById(
+                "dateRangeControl"
+            );
+
+
+        const startDateInput =
+            document.getElementById(
+                "startDate"
+            );
+
+
+        const endDateInput =
+            document.getElementById(
+                "endDate"
             );
 
 
@@ -1001,10 +1131,20 @@
                 );
 
 
-            const hours =
-                Number(
-                    periodSelect.value
-                );
+            let hours;
+
+
+            try {
+
+                hours =
+                    getSelectedPeriod()
+                        .hours;
+            }
+
+            catch(error) {
+
+                hours = 24;
+            }
 
 
             // ------------------------------------------------
@@ -1116,15 +1256,262 @@
 
 
         // ====================================================
+        // Gestion de la période
+        // ====================================================
+
+        function formatLocalDate(date) {
+
+            const year =
+                date.getFullYear();
+
+
+            const month =
+                String(
+                    date.getMonth() + 1
+                ).padStart(
+                    2,
+                    "0"
+                );
+
+
+            const day =
+                String(
+                    date.getDate()
+                ).padStart(
+                    2,
+                    "0"
+                );
+
+
+            return year
+                + "-"
+                + month
+                + "-"
+                + day;
+        }
+
+
+        function initializeDateRange() {
+
+            const today =
+                new Date();
+
+
+            const start =
+                new Date(
+                    today
+                );
+
+
+            start.setDate(
+                start.getDate() - 6
+            );
+
+
+            const maxDate =
+                formatLocalDate(
+                    today
+                );
+
+
+            startDateInput.max =
+                maxDate;
+
+
+            endDateInput.max =
+                maxDate;
+
+
+            if (!startDateInput.value) {
+
+                startDateInput.value =
+                    formatLocalDate(
+                        start
+                    );
+            }
+
+
+            if (!endDateInput.value) {
+
+                endDateInput.value =
+                    maxDate;
+            }
+        }
+
+
+        function updatePeriodControls() {
+
+            const isCustom =
+                periodSelect.value
+                === "custom";
+
+
+            dateRangeControl.classList.toggle(
+                "active",
+                isCustom
+            );
+
+
+            if (isCustom) {
+
+                initializeDateRange();
+            }
+        }
+
+
+        function getSelectedPeriod() {
+
+            if (
+                periodSelect.value
+                !== "custom"
+            ) {
+
+                const hours =
+                    Number(
+                        periodSelect.value
+                    );
+
+
+                const endMs =
+                    Date.now();
+
+
+                return {
+                    isCustom: false,
+                    hours: hours,
+                    startMs:
+                        endMs
+                        - hours
+                        * 60
+                        * 60
+                        * 1000,
+                    endMs: endMs,
+                    query:
+                        "hours="
+                        + encodeURIComponent(
+                            hours
+                        )
+                };
+            }
+
+
+            const startValue =
+                startDateInput.value;
+
+
+            const endValue =
+                endDateInput.value;
+
+
+            if (
+                !startValue
+                || !endValue
+            ) {
+
+                throw new Error(
+                    "Sélectionnez une date de début et une date de fin."
+                );
+            }
+
+
+            const startDate =
+                new Date(
+                    startValue
+                    + "T00:00:00"
+                );
+
+
+            const endExclusive =
+                new Date(
+                    endValue
+                    + "T00:00:00"
+                );
+
+
+            endExclusive.setDate(
+                endExclusive.getDate() + 1
+            );
+
+
+            if (
+                Number.isNaN(
+                    startDate.getTime()
+                )
+                || Number.isNaN(
+                    endExclusive.getTime()
+                )
+                || startValue > endValue
+            ) {
+
+                throw new Error(
+                    "La date de début doit être antérieure ou égale à la date de fin."
+                );
+            }
+
+
+            const durationHours =
+                Math.max(
+                    1,
+                    Math.ceil(
+                        (
+                            endExclusive.getTime()
+                            - startDate.getTime()
+                        )
+                        / (
+                            60
+                            * 60
+                            * 1000
+                        )
+                    )
+                );
+
+
+            return {
+                isCustom: true,
+                hours: durationHours,
+                startMs:
+                    startDate.getTime(),
+                endMs:
+                    Math.min(
+                        endExclusive.getTime() - 1,
+                        Date.now()
+                    ),
+                query:
+                    "start="
+                    + encodeURIComponent(
+                        startValue
+                    )
+                    + "&end="
+                    + encodeURIComponent(
+                        endValue
+                    )
+            };
+        }
+
+
+        // ====================================================
         // Résolution graphique
         // ====================================================
 
         function updateResolutionInfo() {
 
-            const hours =
-                Number(
-                    periodSelect.value
-                );
+            let hours;
+
+
+            try {
+
+                hours =
+                    getSelectedPeriod()
+                        .hours;
+            }
+
+            catch(error) {
+
+                resolutionInfo.textContent =
+                    error.message;
+
+                return;
+            }
 
 
             let text;
@@ -1189,13 +1576,25 @@
                 );
 
 
-            const hours =
-                Number(
-                    periodSelect.value
-                );
-
-
             if (!source) {
+
+                return;
+            }
+
+
+            let period;
+
+
+            try {
+
+                period =
+                    getSelectedPeriod();
+            }
+
+            catch(error) {
+
+                pointsInfo.textContent =
+                    error.message;
 
                 return;
             }
@@ -1233,10 +1632,8 @@
                             + encodeURIComponent(
                                 source
                             )
-                            + "&hours="
-                            + encodeURIComponent(
-                                hours
-                            )
+                            + "&"
+                            + period.query
                         )
 
                     ]
@@ -1408,36 +1805,49 @@
 
 
                 // ============================================
-                // Maintenant
+                // Bornes de la période affichée
                 // ============================================
 
-                const now =
-                    Date.now();
+                const rangeStart =
+                    period.startMs;
+
+
+                const rangeEnd =
+                    period.endMs;
 
 
                 // ============================================
-                // Prolonger la consigne jusqu'à maintenant
+                // Prolonger la consigne jusqu'à la fin
+                // de la période demandée.
                 //
-                // Une consigne reste valable jusqu'à son
-                // prochain changement.
+                // On utilise la dernière consigne présente
+                // dans l'historique, et non la valeur actuelle,
+                // afin de rester juste pour une plage passée.
                 // ============================================
 
-                if (
-                    current
-                    && current.setpoint !== null
-                ) {
+                if (setpoint.length > 0) {
 
-                    setpoint.push(
-                        {
-                            x:
-                                now,
+                    const lastSetpoint =
+                        setpoint[
+                            setpoint.length - 1
+                        ];
 
-                            y:
-                                Number(
-                                    current.setpoint
-                                )
-                        }
-                    );
+
+                    if (
+                        lastSetpoint.x
+                        < rangeEnd
+                    ) {
+
+                        setpoint.push(
+                            {
+                                x:
+                                    rangeEnd,
+
+                                y:
+                                    lastSetpoint.y
+                            }
+                        );
+                    }
                 }
 
 
@@ -1480,9 +1890,15 @@
 
 
                         if (
-                            !lastAmbient
-                            || ambientTimestamp
-                                > lastAmbient.x
+                            ambientTimestamp
+                                >= rangeStart
+                            && ambientTimestamp
+                                <= rangeEnd
+                            && (
+                                !lastAmbient
+                                || ambientTimestamp
+                                    > lastAmbient.x
+                            )
                         ) {
 
                             ambient.push(
@@ -1560,7 +1976,17 @@
                 ];
 
 
-                if (
+                if (period.isCustom) {
+
+                    chart.options.scales.x.min =
+                        rangeStart;
+
+
+                    chart.options.scales.x.max =
+                        rangeEnd;
+                }
+
+                else if (
                     allPoints.length > 0
                 ) {
 
@@ -1578,7 +2004,7 @@
 
 
                     chart.options.scales.x.max =
-                        now;
+                        rangeEnd;
 
                 }
 
@@ -1727,6 +2153,30 @@
             "change",
             function() {
 
+                updatePeriodControls();
+
+                updateResolutionInfo();
+
+                loadData();
+            }
+        );
+
+
+        startDateInput.addEventListener(
+            "change",
+            function() {
+
+                updateResolutionInfo();
+
+                loadData();
+            }
+        );
+
+
+        endDateInput.addEventListener(
+            "change",
+            function() {
+
                 updateResolutionInfo();
 
                 loadData();
@@ -1799,6 +2249,8 @@
                 updateMenu();
 
                 selectSensorFromUrl();
+
+                updatePeriodControls();
 
                 updateResolutionInfo();
 

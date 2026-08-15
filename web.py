@@ -1221,6 +1221,16 @@ def api_temperature_history():
     )
 
 
+    start_date = request.args.get(
+        "start"
+    )
+
+
+    end_date = request.args.get(
+        "end"
+    )
+
+
     # --------------------------------------------------------
     # Validation
     # --------------------------------------------------------
@@ -1235,34 +1245,116 @@ def api_temperature_history():
         return jsonify([])
 
 
-    if hours is None:
-
-        hours = 24
-
-
-    # Pas de limite supérieure.
+    # --------------------------------------------------------
+    # Bornes de période
     #
-    # Si plus tard on veut afficher 2 ans, 5 ans, etc.,
-    # l'API pourra le faire.
-    hours = max(
-        1,
-        hours
-    )
-
-
+    # Deux modes sont acceptés :
+    #
+    #   ?hours=24
+    #
+    # ou une plage de dates inclusive :
+    #
+    #   ?start=2026-08-01&end=2026-08-15
+    #
+    # La date de fin est convertie en borne exclusive au
+    # lendemain à 00:00, ce qui inclut toute la journée "end".
     # --------------------------------------------------------
-    # Début de période
-    # --------------------------------------------------------
 
-    since_datetime = (
-        datetime.now()
-        - timedelta(
-            hours=hours
+    if start_date or end_date:
+
+        if not start_date or not end_date:
+
+            return jsonify(
+                {
+                    "error":
+                        "Les paramètres start et end sont requis ensemble."
+                }
+            ), 400
+
+
+        try:
+
+            since_datetime = datetime.strptime(
+                start_date,
+                "%Y-%m-%d"
+            )
+
+
+            end_day = datetime.strptime(
+                end_date,
+                "%Y-%m-%d"
+            )
+
+        except ValueError:
+
+            return jsonify(
+                {
+                    "error":
+                        "Format de date invalide. Utilisez AAAA-MM-JJ."
+                }
+            ), 400
+
+
+        if end_day < since_datetime:
+
+            return jsonify(
+                {
+                    "error":
+                        "La date de fin doit être postérieure ou égale à la date de début."
+                }
+            ), 400
+
+
+        until_datetime = (
+            end_day
+            + timedelta(
+                days=1
+            )
         )
-    )
+
+
+        hours = max(
+            1,
+            int(
+                (
+                    until_datetime
+                    - since_datetime
+                ).total_seconds()
+                / 3600
+            )
+        )
+
+    else:
+
+        if hours is None:
+
+            hours = 24
+
+
+        # Pas de limite supérieure.
+        hours = max(
+            1,
+            hours
+        )
+
+
+        until_datetime = datetime.now()
+
+
+        since_datetime = (
+            until_datetime
+            - timedelta(
+                hours=hours
+            )
+        )
 
 
     since = since_datetime.isoformat(
+        timespec="milliseconds"
+    )
+
+
+    until = until_datetime.isoformat(
         timespec="milliseconds"
     )
 
@@ -1310,12 +1402,14 @@ def api_temperature_history():
                 WHERE source = ?
                   AND type = 'ambient'
                   AND timestamp >= ?
+                  AND timestamp < ?
 
                 ORDER BY timestamp ASC
                 """,
                 (
                     source,
-                    since
+                    since,
+                    until
                 )
             ).fetchall()
 
@@ -1327,12 +1421,6 @@ def api_temperature_history():
             #
             # On regroupe les changements uniquement pour
             # l'affichage.
-            #
-            # AVG(value) n'est utilisé que dans la réponse
-            # graphique.
-            #
-            # Les lignes originales restent toutes dans
-            # temperature_history.
             # ------------------------------------------------
 
             ambient_rows = db.execute(
@@ -1355,6 +1443,7 @@ def api_temperature_history():
                 WHERE source = ?
                   AND type = 'ambient'
                   AND timestamp >= ?
+                  AND timestamp < ?
 
                 GROUP BY
                     CAST(
@@ -1370,6 +1459,7 @@ def api_temperature_history():
                 (
                     source,
                     since,
+                    until,
                     bucket_seconds
                 )
             ).fetchall()
@@ -1384,9 +1474,6 @@ def api_temperature_history():
 
         # ====================================================
         # Température demandée
-        #
-        # Les consignes changent peu :
-        # on renvoie tous les changements réels.
         # ====================================================
 
         setpoint_rows = db.execute(
@@ -1404,12 +1491,14 @@ def api_temperature_history():
             WHERE source = ?
               AND type = 'setpoint'
               AND timestamp >= ?
+              AND timestamp < ?
 
             ORDER BY timestamp ASC
             """,
             (
                 source,
-                since
+                since,
+                until
             )
         ).fetchall()
 
@@ -1424,18 +1513,8 @@ def api_temperature_history():
         # ====================================================
         # Valeur connue avant le début de période
         #
-        # Exemple :
-        #
-        # Consigne 19°C depuis 4 jours.
-        #
-        # On affiche 24 h.
-        #
-        # Aucun changement de consigne dans ces 24 h.
-        #
-        # On récupère donc le dernier 19°C précédent et
-        # on place un point artificiel au début du graphique.
-        #
-        # Cela ne crée RIEN dans SQLite.
+        # Elle permet au graphique de démarrer avec l'état
+        # connu au début de la plage, sans modifier SQLite.
         # ====================================================
 
         for temp_type in (
@@ -1478,7 +1557,6 @@ def api_temperature_history():
                 )
 
 
-                # Point uniquement destiné au graphique
                 previous[
                     "timestamp"
                 ] = since
