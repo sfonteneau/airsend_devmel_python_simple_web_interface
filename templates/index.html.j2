@@ -1,160 +1,815 @@
 <!DOCTYPE html>
+
 <html>
+
 <head>
-    <title>Contrôle des volets roulants</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+
+    <title>
+        Contrôle des volets roulants
+    </title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+    >
+
+
     <style>
-        .collection-item {
+
+        body {
+            background-color: #fafafa;
+        }
+
+
+        .navbar {
+
+            background-color: #f5f5f5;
+
+            padding: 10px;
+
+            position: fixed;
+
+            top: 0;
+
+            width: 100%;
+
+            z-index: 999;
+
             display: flex;
+
+            justify-content:
+                space-between;
+
+            align-items: center;
+
+            box-shadow:
+                0 2px 5px
+                rgba(0, 0, 0, 0.15);
+        }
+
+
+        .navbar ul {
+
+            margin: 0;
+
+            padding: 0;
+
+            display: flex;
+
+            list-style: none;
+
+            align-items: center;
+        }
+
+
+        .navbar ul li a {
+
+            display: block;
+
+            padding: 10px;
+
+            color: #333;
+        }
+
+
+        .navbar .menu-icon {
+
+            display: none;
+
+            padding: 10px;
+
+            color: #333;
+        }
+
+
+        .main-content {
+
+            margin-top: 90px;
+
+            padding-bottom: 30px;
+        }
+
+
+        /* ====================================================
+           Températures
+           ==================================================== */
+
+        .temperature-section {
+
+            margin-bottom: 30px;
+        }
+
+
+        .temperature-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(220px, 1fr)
+                );
+
+            gap: 15px;
+        }
+
+
+        .temperature-card {
+
+            display: block;
+
+            background: white;
+
+            border-radius: 8px;
+
+            padding: 18px;
+
+            color: inherit;
+
+            box-shadow:
+                0 2px 6px
+                rgba(0, 0, 0, 0.12);
+
+            transition:
+                transform 0.15s,
+                box-shadow 0.15s;
+        }
+
+
+        .temperature-card:hover {
+
+            transform:
+                translateY(-2px);
+
+            box-shadow:
+                0 4px 12px
+                rgba(0, 0, 0, 0.16);
+        }
+
+
+        .temperature-name {
+
+            font-size: 1.35rem;
+
+            font-weight: 500;
+
+            margin-bottom: 15px;
+        }
+
+
+        .temperature-values {
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            gap: 15px;
+        }
+
+
+        .temperature-value {
+
+            flex: 1;
+
+            text-align: center;
+        }
+
+
+        .temperature-label {
+
+            display: block;
+
+            font-size: 0.85rem;
+
+            color: #777;
+
+            margin-bottom: 3px;
+        }
+
+
+        .temperature-number {
+
+            display: block;
+
+            font-size: 1.6rem;
+
+            font-weight: 500;
+        }
+
+
+        .temperature-ambient {
+
+            color: #1976d2;
+        }
+
+
+        .temperature-setpoint {
+
+            color: #ef6c00;
+        }
+
+
+        .temperature-missing {
+
+            color: #999;
+        }
+
+
+        .temperature-history {
+
+            display: block;
+
+            text-align: center;
+
+            margin-top: 15px;
+
+            color: #777;
+
+            font-size: 0.85rem;
+        }
+
+
+        /* ====================================================
+           Volets
+           ==================================================== */
+
+        .collection-item {
+
+            display: flex;
+
             flex-direction: column;
         }
+
+
         .buttons {
+
             display: flex;
+
             flex-wrap: wrap;
+
             justify-content: center;
+
             align-items: center;
+
             gap: 10px;
         }
+
+
         .buttons a {
+
             flex-basis: 150px;
         }
-        .navbar {
-            background-color: #f5f5f5;
-            padding: 10px;
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 999;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+
+
+        .volet-title {
+
+            margin-top: 5px;
+
+            margin-bottom: 20px;
         }
-        .navbar .brand-logo {
-            margin-left: 20px;
-        }
-        .navbar ul {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: flex-end;
-            list-style: none;
-            align-items: center;
-        }
-        .navbar ul li {
-            margin: 0;
-        }
-        .navbar ul li a {
-            display: block;
-            padding: 10px;
-        }
-        .main-content {
-            margin-top: 70px;
-        }
-        @media (max-width: 600px) {
+
+
+        /* ====================================================
+           Mobile
+           ==================================================== */
+
+        @media (
+            max-width: 600px
+        ) {
+
             .buttons a {
+
                 flex-basis: 100%;
+
                 margin-bottom: 10px;
             }
+
+
             .navbar ul {
+
                 flex-direction: column;
+
                 display: none;
             }
+
+
             .navbar ul.show {
+
                 display: flex;
             }
+
+
             .navbar ul li {
+
                 margin-bottom: 10px;
             }
+
+
             .navbar .menu-icon {
+
                 display: block;
-                padding: 10px;
             }
+
+
             .main-content {
-                margin-top: 140px;
+
+                margin-top: 90px;
+            }
+
+
+            .temperature-values {
+
+                gap: 5px;
+            }
+
+
+            .temperature-number {
+
+                font-size: 1.4rem;
             }
         }
+
     </style>
+
 </head>
+
+
 <body>
+
+
+    <!-- =====================================================
+         Navigation
+         ===================================================== -->
+
     <div class="navbar">
-        <ul id="menu" class="">
-            <li><a href="/individuel">Individuel</a></li>
-            <li><a href="/">Groupe</a></li>
+
+        <ul id="menu">
+
+            <li>
+
+                <a href="/individuel">
+                    Individuel
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a href="/">
+                    Groupe
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a href="/historique">
+                    Historique
+                </a>
+
+            </li>
+
         </ul>
-        <a href="#" class="menu-icon" onclick="toggleMenu()">&#9776;</a>
+
+
+        <a
+            href="#"
+            class="menu-icon"
+            onclick="toggleMenu(); return false;"
+        >
+            &#9776;
+        </a>
+
     </div>
+
 
     <div class="container main-content">
-       <!-- <h1>Contrôle des volets roulants</h1> -->
+
+
+        <!-- =================================================
+             Températures
+             ================================================= -->
+
+        {% if temperatures is defined and temperatures %}
+
+        <div class="temperature-section">
+
+            <h5>
+                Températures
+            </h5>
+
+
+            <div class="temperature-grid">
+
+
+                {% for source, temp in temperatures.items() %}
+
+                <a
+                    class="temperature-card"
+                    href="/historique?source={{ source }}"
+                >
+
+                    <div class="temperature-name">
+
+                        {{ temp['name'] }}
+
+                    </div>
+
+
+                    <div class="temperature-values">
+
+
+                        <!-- Ambiante -->
+
+                        <div class="temperature-value">
+
+                            <span class="temperature-label">
+                                Ambiante
+                            </span>
+
+
+                            {% if temp['ambient'] is not none %}
+
+                            <span
+                                class="
+                                    temperature-number
+                                    temperature-ambient
+                                "
+                            >
+
+                                {{
+                                    "%.1f"
+                                    |format(
+                                        temp['ambient']
+                                    )
+                                }}
+                                °C
+
+                            </span>
+
+
+                            {% else %}
+
+                            <span
+                                class="
+                                    temperature-number
+                                    temperature-missing
+                                "
+                            >
+                                --
+                            </span>
+
+                            {% endif %}
+
+                        </div>
+
+
+                        <!-- Demandée -->
+
+                        <div class="temperature-value">
+
+                            <span class="temperature-label">
+                                Demandée
+                            </span>
+
+
+                            {% if temp['setpoint'] is not none %}
+
+                            <span
+                                class="
+                                    temperature-number
+                                    temperature-setpoint
+                                "
+                            >
+
+                                {{
+                                    "%.1f"
+                                    |format(
+                                        temp['setpoint']
+                                    )
+                                }}
+                                °C
+
+                            </span>
+
+
+                            {% else %}
+
+                            <span
+                                class="
+                                    temperature-number
+                                    temperature-missing
+                                "
+                            >
+                                --
+                            </span>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <span class="temperature-history">
+
+                        <i
+                            class="material-icons"
+                            style="
+                                font-size: 16px;
+                                vertical-align: middle;
+                            "
+                        >
+                            show_chart
+                        </i>
+
+                        Voir l'historique
+
+                    </span>
+
+                </a>
+
+                {% endfor %}
+
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+
+        <!-- =================================================
+             Volets
+             ================================================= -->
+
         {% for entry in datajson %}
+
         <ul class="collection">
+
             <li class="collection-item">
-                <h4>{{ entry['name'] }}</h4>
+
+                <h4 class="volet-title">
+
+                    {{ entry['name'] }}
+
+                </h4>
+
+
                 <div class="buttons">
-                    <a class="waves-effect waves-light btn" onclick="sendCommand('{{ entry['name'] }}', 'UP')"><i class="material-icons left">arrow_upward</i>Haut</a>
-                    <a class="waves-effect waves-light btn" onclick="sendCommand('{{ entry['name'] }}', 'DOWN')"><i class="material-icons left">arrow_downward</i>Bas</a>
-                    <a class="waves-effect waves-light btn red" onclick="sendCommand('{{ entry['name'] }}', 'STOP')"><i class="material-icons left">stop</i>Stop</a>
-                    <a class="waves-effect waves-light btn orange" onclick="sendCommand('{{ entry['name'] }}', 'USERPOSITION')"><i class="material-icons left">pause</i>Position intermédiaire</a>
+
+                    <a
+                        class="
+                            waves-effect
+                            waves-light
+                            btn
+                        "
+
+                        onclick="
+                            sendCommand(
+                                '{{ entry['name'] }}',
+                                'UP'
+                            )
+                        "
+                    >
+
+                        <i class="material-icons left">
+                            arrow_upward
+                        </i>
+
+                        Haut
+
+                    </a>
+
+
+                    <a
+                        class="
+                            waves-effect
+                            waves-light
+                            btn
+                        "
+
+                        onclick="
+                            sendCommand(
+                                '{{ entry['name'] }}',
+                                'DOWN'
+                            )
+                        "
+                    >
+
+                        <i class="material-icons left">
+                            arrow_downward
+                        </i>
+
+                        Bas
+
+                    </a>
+
+
+                    <a
+                        class="
+                            waves-effect
+                            waves-light
+                            btn
+                            red
+                        "
+
+                        onclick="
+                            sendCommand(
+                                '{{ entry['name'] }}',
+                                'STOP'
+                            )
+                        "
+                    >
+
+                        <i class="material-icons left">
+                            stop
+                        </i>
+
+                        Stop
+
+                    </a>
+
+
+                    <a
+                        class="
+                            waves-effect
+                            waves-light
+                            btn
+                            orange
+                        "
+
+                        onclick="
+                            sendCommand(
+                                '{{ entry['name'] }}',
+                                'USERPOSITION'
+                            )
+                        "
+                    >
+
+                        <i class="material-icons left">
+                            pause
+                        </i>
+
+                        Position intermédiaire
+
+                    </a>
+
                 </div>
+
             </li>
+
         </ul>
+
         {% endfor %}
+
+
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"
+    ></script>
+
+
     <script>
-        function sendCommand(voletId, action) {
-            var command = {
-                voletId: voletId,
-                action: action
+
+        function sendCommand(
+            voletId,
+            action
+        ) {
+
+            const command = {
+
+                voletId:
+                    voletId,
+
+                action:
+                    action
             };
-            var url = '/api/action';
-            var options = {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(command)
-            };
-            fetch(url, options)
-                .then(response => {
-                    if (response.ok) {
-                        console.log('Command sent successfully');
-                    } else {
-                        console.error('Failed to send command');
+
+
+            fetch(
+
+                "/api/action",
+
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify(
+                            command
+                        )
+                }
+            )
+
+            .then(
+                response => {
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            "Erreur HTTP "
+                            + response.status
+                        );
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
+                }
+            )
+
+            .catch(
+                error => {
+
+                    console.error(
+                        "Erreur:",
+                        error
+                    );
+                }
+            );
         }
+
 
         function toggleMenu() {
-            var menu = document.getElementById('menu');
-            menu.classList.toggle('show');
+
+            const menu =
+                document.getElementById(
+                    "menu"
+                );
+
+            menu.classList.toggle(
+                "show"
+            );
         }
 
-        window.addEventListener('resize', function() {
-            var menu = document.getElementById('menu');
-            var menuIcon = document.querySelector('.menu-icon');
-            if (window.innerWidth > 600) {
-                menu.classList.remove('show');
-                menuIcon.style.display = 'none';
-            } else {
-                menuIcon.style.display = 'block';
-            }
-        });
 
-        window.addEventListener('load', function() {
-            var menu = document.getElementById('menu');
-            var menuIcon = document.querySelector('.menu-icon');
-            if (window.innerWidth <= 600) {
-                menuIcon.style.display = 'block';
+        function updateMenu() {
+
+            const menu =
+                document.getElementById(
+                    "menu"
+                );
+
+            const menuIcon =
+                document.querySelector(
+                    ".menu-icon"
+                );
+
+
+            if (
+                window.innerWidth
+                > 600
+            ) {
+
+                menu.classList.remove(
+                    "show"
+                );
+
+                menuIcon.style.display =
+                    "none";
+
             }
-        });
+
+            else {
+
+                menuIcon.style.display =
+                    "block";
+            }
+        }
+
+
+        window.addEventListener(
+            "resize",
+            updateMenu
+        );
+
+
+        window.addEventListener(
+            "load",
+            updateMenu
+        );
+
     </script>
-</body>
-</html>
 
+
+</body>
+
+</html>

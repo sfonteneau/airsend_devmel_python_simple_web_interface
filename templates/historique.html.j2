@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>
+        Historique des températures
+    </title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+
+    <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    >
+
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+    >
+
+
+    <!--
+        Chart.js
+
+        Axe X en timestamps Unix millisecondes.
+        Pas besoin d'adapter supplémentaire pour les dates.
+    -->
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+    ></script>
+
+
+    <style>
+
+        body {
+
+            background-color: #fafafa;
+        }
+
+
+        /* ====================================================
+           Navigation
+           ==================================================== */
+
+        .navbar {
+
+            background-color: #f5f5f5;
+
+            padding: 10px;
+
+            position: fixed;
+
+            top: 0;
+
+            width: 100%;
+
+            z-index: 999;
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            align-items: center;
+
+            box-shadow:
+                0 2px 5px
+                rgba(0, 0, 0, 0.15);
+        }
+
+
+        .navbar ul {
+
+            margin: 0;
+
+            padding: 0;
+
+            display: flex;
+
+            list-style: none;
+
+            align-items: center;
+        }
+
+
+        .navbar ul li a {
+
+            display: block;
+
+            padding: 10px;
+
+            color: #333;
+        }
+
+
+        .navbar .menu-icon {
+
+            display: none;
+
+            padding: 10px;
+
+            color: #333;
+        }
+
+
+        /* ====================================================
+           Contenu
+           ==================================================== */
+
+        .main-content {
+
+            margin-top: 90px;
+
+            padding-bottom: 40px;
+        }
+
+
+        /* ====================================================
+           Contrôles
+           ==================================================== */
+
+        .controls {
+
+            display: flex;
+
+            flex-wrap: wrap;
+
+            gap: 20px;
+
+            align-items: flex-end;
+
+            margin-bottom: 15px;
+        }
+
+
+        .control {
+
+            min-width: 180px;
+        }
+
+
+        .control label {
+
+            display: block;
+
+            margin-bottom: 5px;
+
+            font-size: 0.9rem;
+
+            color: #555;
+        }
+
+
+        .loading {
+
+            display: none;
+
+            margin-left: 10px;
+
+            color: #777;
+        }
+
+
+        /* ====================================================
+           Infos historique
+           ==================================================== */
+
+        .history-info {
+
+            display: flex;
+
+            flex-wrap: wrap;
+
+            gap: 8px 25px;
+
+            margin-top: 5px;
+
+            margin-bottom: 20px;
+
+            color: #777;
+
+            font-size: 0.9rem;
+        }
+
+
+        /* ====================================================
+           Valeurs actuelles
+           ==================================================== */
+
+        .current-values {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(200px, 1fr)
+                );
+
+            gap: 15px;
+
+            margin-bottom: 20px;
+        }
+
+
+        .current-value {
+
+            background: white;
+
+            padding: 20px;
+
+            border-radius: 8px;
+
+            box-shadow:
+                0 2px 6px
+                rgba(0, 0, 0, 0.12);
+        }
+
+
+        .current-label {
+
+            color: #777;
+
+            font-size: 0.9rem;
+
+            margin-bottom: 5px;
+        }
+
+
+        .current-number {
+
+            font-size: 2rem;
+
+            font-weight: 500;
+        }
+
+
+        .ambient {
+
+            color: #1976d2;
+        }
+
+
+        .setpoint {
+
+            color: #ef6c00;
+        }
+
+
+        .current-updated {
+
+            color: #999;
+
+            margin-top: 5px;
+
+            font-size: 0.8rem;
+        }
+
+
+        /* ====================================================
+           Graphe
+           ==================================================== */
+
+        .chart-card {
+
+            background: white;
+
+            border-radius: 8px;
+
+            padding: 20px;
+
+            box-shadow:
+                0 2px 6px
+                rgba(0, 0, 0, 0.12);
+        }
+
+
+        .chart-container {
+
+            position: relative;
+
+            height: 500px;
+        }
+
+
+        /* ====================================================
+           Mobile
+           ==================================================== */
+
+        @media (
+            max-width: 600px
+        ) {
+
+            .navbar ul {
+
+                display: none;
+
+                flex-direction: column;
+            }
+
+
+            .navbar ul.show {
+
+                display: flex;
+            }
+
+
+            .navbar .menu-icon {
+
+                display: block;
+            }
+
+
+            .main-content {
+
+                margin-top: 90px;
+            }
+
+
+            .controls {
+
+                display: block;
+            }
+
+
+            .control {
+
+                margin-bottom: 15px;
+            }
+
+
+            .chart-card {
+
+                padding: 10px;
+            }
+
+
+            .chart-container {
+
+                height: 400px;
+            }
+
+
+            .history-info {
+
+                display: block;
+            }
+
+
+            .history-info div {
+
+                margin-bottom: 5px;
+            }
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <!-- =====================================================
+         Navigation
+         ===================================================== -->
+
+    <div class="navbar">
+
+        <ul id="menu">
+
+            <li>
+
+                <a href="/individuel">
+                    Individuel
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a href="/">
+                    Groupe
+                </a>
+
+            </li>
+
+
+            <li>
+
+                <a href="/historique">
+                    Historique
+                </a>
+
+            </li>
+
+        </ul>
+
+
+        <a
+            href="#"
+            class="menu-icon"
+            onclick="toggleMenu(); return false;"
+        >
+
+            &#9776;
+
+        </a>
+
+    </div>
+
+
+    <!-- =====================================================
+         Contenu
+         ===================================================== -->
+
+    <div class="container main-content">
+
+
+        <h4>
+            Historique des températures
+        </h4>
+
+
+        <!-- =================================================
+             Sélection
+             ================================================= -->
+
+        <div class="controls">
+
+
+            <!-- Sonde -->
+
+            <div class="control">
+
+                <label for="sensor">
+                    Sonde
+                </label>
+
+
+                <select
+                    id="sensor"
+                    class="browser-default"
+                >
+
+                    {% for sensor in sensors %}
+
+                    <option
+                        value="{{ sensor.source }}"
+                    >
+
+                        {{ sensor.name }}
+
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Période -->
+
+            <div class="control">
+
+                <label for="period">
+                    Période
+                </label>
+
+
+                <select
+                    id="period"
+                    class="browser-default"
+                >
+
+                    <option value="6">
+                        6 heures
+                    </option>
+
+
+                    <option
+                        value="24"
+                        selected
+                    >
+                        24 heures
+                    </option>
+
+
+                    <option value="72">
+                        3 jours
+                    </option>
+
+
+                    <option value="168">
+                        7 jours
+                    </option>
+
+
+                    <option value="720">
+                        30 jours
+                    </option>
+
+
+                    <option value="2160">
+                        3 mois
+                    </option>
+
+
+                    <option value="8760">
+                        1 an
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- Actualisation -->
+
+            <div class="control">
+
+                <button
+                    class="
+                        waves-effect
+                        waves-light
+                        btn
+                    "
+                    onclick="loadData()"
+                >
+
+                    <i class="material-icons left">
+                        refresh
+                    </i>
+
+                    Actualiser
+
+                </button>
+
+
+                <span
+                    id="loading"
+                    class="loading"
+                >
+
+                    Chargement...
+
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             Informations
+             ================================================= -->
+
+        <div class="history-info">
+
+            <div id="resolutionInfo">
+            </div>
+
+
+            <div id="pointsInfo">
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             Valeurs actuelles
+             ================================================= -->
+
+        <div class="current-values">
+
+
+            <!-- Ambiante -->
+
+            <div class="current-value">
+
+                <div class="current-label">
+                    Température ambiante
+                </div>
+
+
+                <div
+                    id="ambientValue"
+                    class="
+                        current-number
+                        ambient
+                    "
+                >
+
+                    --
+
+                </div>
+
+
+                <div
+                    id="ambientUpdated"
+                    class="current-updated"
+                >
+                </div>
+
+            </div>
+
+
+            <!-- Consigne -->
+
+            <div class="current-value">
+
+                <div class="current-label">
+                    Température demandée
+                </div>
+
+
+                <div
+                    id="setpointValue"
+                    class="
+                        current-number
+                        setpoint
+                    "
+                >
+
+                    --
+
+                </div>
+
+
+                <div
+                    id="setpointUpdated"
+                    class="current-updated"
+                >
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+        <!-- =================================================
+             Graphe
+             ================================================= -->
+
+        <div class="chart-card">
+
+            <div class="chart-container">
+
+                <canvas
+                    id="temperatureChart"
+                ></canvas>
+
+            </div>
+
+        </div>
+
+
+    </div>
+
+
+    <!-- =====================================================
+         Javascript
+         ===================================================== -->
+
+    <script>
+
+
+        // ====================================================
+        // Éléments HTML
+        // ====================================================
+
+        const sensorSelect =
+            document.getElementById(
+                "sensor"
+            );
+
+
+        const periodSelect =
+            document.getElementById(
+                "period"
+            );
+
+
+        const ambientValue =
+            document.getElementById(
+                "ambientValue"
+            );
+
+
+        const setpointValue =
+            document.getElementById(
+                "setpointValue"
+            );
+
+
+        const ambientUpdated =
+            document.getElementById(
+                "ambientUpdated"
+            );
+
+
+        const setpointUpdated =
+            document.getElementById(
+                "setpointUpdated"
+            );
+
+
+        const resolutionInfo =
+            document.getElementById(
+                "resolutionInfo"
+            );
+
+
+        const pointsInfo =
+            document.getElementById(
+                "pointsInfo"
+            );
+
+
+        const loading =
+            document.getElementById(
+                "loading"
+            );
+
+
+        // ====================================================
+        // Chart.js
+        // ====================================================
+
+        const ctx =
+            document
+                .getElementById(
+                    "temperatureChart"
+                )
+                .getContext("2d");
+
+
+        const chart =
+            new Chart(
+
+                ctx,
+
+                {
+
+                    type:
+                        "line",
+
+
+                    data: {
+
+                        datasets: [
+
+                            // =================================
+                            // Température ambiante
+                            // =================================
+
+                            {
+                                label:
+                                    "Température ambiante",
+
+                                data:
+                                    [],
+
+                                borderColor:
+                                    "#1976d2",
+
+                                backgroundColor:
+                                    "#1976d2",
+
+                                borderWidth:
+                                    2,
+
+                                pointRadius:
+                                    1,
+
+                                pointHoverRadius:
+                                    5,
+
+                                tension:
+                                    0.15
+                            },
+
+
+                            // =================================
+                            // Température demandée
+                            // =================================
+
+                            {
+                                label:
+                                    "Température demandée",
+
+                                data:
+                                    [],
+
+                                borderColor:
+                                    "#ef6c00",
+
+                                backgroundColor:
+                                    "#ef6c00",
+
+                                borderWidth:
+                                    2,
+
+                                pointRadius:
+                                    2,
+
+                                pointHoverRadius:
+                                    5,
+
+                                stepped:
+                                    "before"
+                            }
+
+                        ]
+                    },
+
+
+                    options: {
+
+                        responsive:
+                            true,
+
+
+                        maintainAspectRatio:
+                            false,
+
+
+                        // Plus fluide sur les longues périodes
+                        animation:
+                            false,
+
+
+                        interaction: {
+
+                            mode:
+                                "nearest",
+
+                            intersect:
+                                false
+                        },
+
+
+                        scales: {
+
+
+                            // ===============================
+                            // Axe X
+                            // ===============================
+
+                            x: {
+
+                                type:
+                                    "linear",
+
+
+                                ticks: {
+
+                                    autoSkip:
+                                        true,
+
+                                    maxTicksLimit:
+                                        10,
+
+                                    callback:
+                                        function(value) {
+
+                                            return formatAxisDate(
+                                                value
+                                            );
+                                        }
+                                },
+
+
+                                title: {
+
+                                    display:
+                                        true,
+
+                                    text:
+                                        "Date / heure"
+                                }
+                            },
+
+
+                            // ===============================
+                            // Axe Y
+                            // ===============================
+
+                            y: {
+
+                                title: {
+
+                                    display:
+                                        true,
+
+                                    text:
+                                        "Température (°C)"
+                                }
+                            }
+                        },
+
+
+                        plugins: {
+
+
+                            // ===============================
+                            // Légende
+                            // ===============================
+
+                            legend: {
+
+                                position:
+                                    "top"
+                            },
+
+
+                            // ===============================
+                            // Tooltip
+                            // ===============================
+
+                            tooltip: {
+
+                                callbacks: {
+
+
+                                    title:
+                                        function(items) {
+
+                                            if (
+                                                items.length
+                                                === 0
+                                            ) {
+
+                                                return "";
+                                            }
+
+
+                                            return (
+                                                new Date(
+                                                    items[0]
+                                                        .parsed
+                                                        .x
+                                                )
+                                                .toLocaleString(
+                                                    "fr-FR"
+                                                )
+                                            );
+                                        },
+
+
+                                    label:
+                                        function(context) {
+
+                                            return (
+                                                context
+                                                    .dataset
+                                                    .label
+
+                                                + " : "
+
+                                                + context
+                                                    .parsed
+                                                    .y
+                                                    .toFixed(1)
+
+                                                + " °C"
+                                            );
+                                        }
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+
+
+        // ====================================================
+        // Formatage date axe X
+        // ====================================================
+
+        function formatAxisDate(
+            timestamp
+        ) {
+
+            const date =
+                new Date(
+                    timestamp
+                );
+
+
+            const hours =
+                Number(
+                    periodSelect.value
+                );
+
+
+            // ------------------------------------------------
+            // 6 h / 24 h / 3 jours
+            // ------------------------------------------------
+
+            if (hours <= 72) {
+
+                return date.toLocaleString(
+                    "fr-FR",
+                    {
+                        day:
+                            "2-digit",
+
+                        month:
+                            "2-digit",
+
+                        hour:
+                            "2-digit",
+
+                        minute:
+                            "2-digit"
+                    }
+                );
+            }
+
+
+            // ------------------------------------------------
+            // 7 jours / 30 jours
+            // ------------------------------------------------
+
+            if (hours <= 720) {
+
+                return date.toLocaleDateString(
+                    "fr-FR",
+                    {
+                        day:
+                            "2-digit",
+
+                        month:
+                            "2-digit"
+                    }
+                );
+            }
+
+
+            // ------------------------------------------------
+            // 3 mois
+            // ------------------------------------------------
+
+            if (hours < 8760) {
+
+                return date.toLocaleDateString(
+                    "fr-FR",
+                    {
+                        day:
+                            "2-digit",
+
+                        month:
+                            "2-digit"
+                    }
+                );
+            }
+
+
+            // ------------------------------------------------
+            // 1 an
+            // ------------------------------------------------
+
+            return date.toLocaleDateString(
+                "fr-FR",
+                {
+                    day:
+                        "2-digit",
+
+                    month:
+                        "2-digit",
+
+                    year:
+                        "2-digit"
+                }
+            );
+        }
+
+
+        // ====================================================
+        // Date dernière réception
+        // ====================================================
+
+        function formatUpdatedDate(
+            timestamp
+        ) {
+
+            if (!timestamp) {
+
+                return "";
+            }
+
+
+            return (
+                "Dernière réception : "
+                + new Date(
+                    timestamp
+                ).toLocaleString(
+                    "fr-FR"
+                )
+            );
+        }
+
+
+        // ====================================================
+        // Résolution graphique
+        // ====================================================
+
+        function updateResolutionInfo() {
+
+            const hours =
+                Number(
+                    periodSelect.value
+                );
+
+
+            let text;
+
+
+            if (hours <= 72) {
+
+                text =
+                    "Résolution : tous les changements";
+
+            }
+
+            else if (hours <= 168) {
+
+                text =
+                    "Résolution graphique : 5 minutes";
+
+            }
+
+            else if (hours <= 720) {
+
+                text =
+                    "Résolution graphique : 30 minutes";
+
+            }
+
+            else if (hours <= 2160) {
+
+                text =
+                    "Résolution graphique : 1 heure";
+
+            }
+
+            else if (hours <= 8760) {
+
+                text =
+                    "Résolution graphique : 6 heures";
+
+            }
+
+            else {
+
+                text =
+                    "Résolution graphique : automatique";
+            }
+
+
+            resolutionInfo.textContent =
+                text;
+        }
+
+
+        // ====================================================
+        // Chargement des données
+        // ====================================================
+
+        async function loadData() {
+
+            const source =
+                Number(
+                    sensorSelect.value
+                );
+
+
+            const hours =
+                Number(
+                    periodSelect.value
+                );
+
+
+            if (!source) {
+
+                return;
+            }
+
+
+            loading.style.display =
+                "inline";
+
+
+            pointsInfo.textContent =
+                "";
+
+
+            try {
+
+                // --------------------------------------------
+                // Dernier état + historique
+                // --------------------------------------------
+
+                const [
+                    currentResponse,
+                    historyResponse
+                ] = await Promise.all(
+
+                    [
+
+                        fetch(
+                            "/api/temperatures"
+                        ),
+
+
+                        fetch(
+                            "/api/temperatures/history"
+                            + "?source="
+                            + encodeURIComponent(
+                                source
+                            )
+                            + "&hours="
+                            + encodeURIComponent(
+                                hours
+                            )
+                        )
+
+                    ]
+                );
+
+
+                if (
+                    !currentResponse.ok
+                    || !historyResponse.ok
+                ) {
+
+                    throw new Error(
+                        "Erreur HTTP"
+                    );
+                }
+
+
+                const currentRows =
+                    await currentResponse.json();
+
+
+                const history =
+                    await historyResponse.json();
+
+
+                const current =
+                    currentRows.find(
+
+                        row =>
+
+                            Number(
+                                row.source
+                            )
+                            === source
+                    );
+
+
+                // ============================================
+                // Valeur ambiante actuelle
+                // ============================================
+
+                if (
+                    current
+                    && current.ambient !== null
+                ) {
+
+                    ambientValue.textContent =
+                        Number(
+                            current.ambient
+                        ).toFixed(1)
+                        + " °C";
+
+
+                    ambientUpdated.textContent =
+                        formatUpdatedDate(
+                            current.ambient_updated
+                        );
+                }
+
+                else {
+
+                    ambientValue.textContent =
+                        "--";
+
+                    ambientUpdated.textContent =
+                        "";
+                }
+
+
+                // ============================================
+                // Consigne actuelle
+                // ============================================
+
+                if (
+                    current
+                    && current.setpoint !== null
+                ) {
+
+                    setpointValue.textContent =
+                        Number(
+                            current.setpoint
+                        ).toFixed(1)
+                        + " °C";
+
+
+                    setpointUpdated.textContent =
+                        formatUpdatedDate(
+                            current.setpoint_updated
+                        );
+                }
+
+                else {
+
+                    setpointValue.textContent =
+                        "--";
+
+                    setpointUpdated.textContent =
+                        "";
+                }
+
+
+                // ============================================
+                // Création datasets
+                // ============================================
+
+                const ambient = [];
+
+                const setpoint = [];
+
+
+                for (
+                    const row
+                    of history
+                ) {
+
+                    const timestamp =
+                        new Date(
+                            row.timestamp
+                        ).getTime();
+
+
+                    if (
+                        Number.isNaN(
+                            timestamp
+                        )
+                    ) {
+
+                        continue;
+                    }
+
+
+                    if (
+                        row.type
+                        === "ambient"
+                    ) {
+
+                        ambient.push(
+                            {
+                                x:
+                                    timestamp,
+
+                                y:
+                                    Number(
+                                        row.value
+                                    )
+                            }
+                        );
+                    }
+
+
+                    else if (
+                        row.type
+                        === "setpoint"
+                    ) {
+
+                        setpoint.push(
+                            {
+                                x:
+                                    timestamp,
+
+                                y:
+                                    Number(
+                                        row.value
+                                    )
+                            }
+                        );
+                    }
+                }
+
+
+                // ============================================
+                // Maintenant
+                // ============================================
+
+                const now =
+                    Date.now();
+
+
+                // ============================================
+                // Prolonger la consigne jusqu'à maintenant
+                //
+                // Une consigne reste valable jusqu'à son
+                // prochain changement.
+                // ============================================
+
+                if (
+                    current
+                    && current.setpoint !== null
+                ) {
+
+                    setpoint.push(
+                        {
+                            x:
+                                now,
+
+                            y:
+                                Number(
+                                    current.setpoint
+                                )
+                        }
+                    );
+                }
+
+
+                // ============================================
+                // Ajouter la dernière température ambiante
+                //
+                // temperature_history n'enregistre que les
+                // changements.
+                //
+                // temperature_state contient en revanche
+                // l'heure de la dernière réception.
+                //
+                // On ajoute donc ce dernier point réel.
+                // ============================================
+
+                if (
+                    current
+                    && current.ambient !== null
+                    && current.ambient_updated
+                ) {
+
+                    const ambientTimestamp =
+                        new Date(
+                            current.ambient_updated
+                        ).getTime();
+
+
+                    if (
+                        !Number.isNaN(
+                            ambientTimestamp
+                        )
+                    ) {
+
+                        const lastAmbient =
+                            ambient.length
+                            ? ambient[
+                                ambient.length - 1
+                            ]
+                            : null;
+
+
+                        if (
+                            !lastAmbient
+                            || ambientTimestamp
+                                > lastAmbient.x
+                        ) {
+
+                            ambient.push(
+                                {
+                                    x:
+                                        ambientTimestamp,
+
+                                    y:
+                                        Number(
+                                            current.ambient
+                                        )
+                                }
+                            );
+                        }
+                    }
+                }
+
+
+                // ============================================
+                // Tri chronologique
+                // ============================================
+
+                ambient.sort(
+                    (
+                        a,
+                        b
+                    ) =>
+                        a.x - b.x
+                );
+
+
+                setpoint.sort(
+                    (
+                        a,
+                        b
+                    ) =>
+                        a.x - b.x
+                );
+
+
+                // ============================================
+                // Données Chart.js
+                // ============================================
+
+                chart.data.datasets[
+                    0
+                ].data = ambient;
+
+
+                chart.data.datasets[
+                    1
+                ].data = setpoint;
+
+
+                // ============================================
+                // Limites réelles du graphique
+                //
+                // IMPORTANT :
+                //
+                // La période sélectionnée est seulement
+                // une profondeur MAXIMALE.
+                //
+                // Exemple :
+                //
+                // période demandée = 1 an
+                // historique existant = 3 jours
+                //
+                // Le graphique affichera uniquement ces
+                // 3 jours, et pas 362 jours vides.
+                // ============================================
+
+                const allPoints = [
+                    ...ambient,
+                    ...setpoint
+                ];
+
+
+                if (
+                    allPoints.length > 0
+                ) {
+
+                    const firstTimestamp =
+                        Math.min(
+                            ...allPoints.map(
+                                point =>
+                                    point.x
+                            )
+                        );
+
+
+                    chart.options.scales.x.min =
+                        firstTimestamp;
+
+
+                    chart.options.scales.x.max =
+                        now;
+
+                }
+
+                else {
+
+                    // Aucune donnée :
+                    // Chart.js choisit lui-même son axe.
+
+                    delete chart
+                        .options
+                        .scales
+                        .x
+                        .min;
+
+
+                    delete chart
+                        .options
+                        .scales
+                        .x
+                        .max;
+                }
+
+
+                // ============================================
+                // Mise à jour
+                // ============================================
+
+                chart.update();
+
+
+                // ============================================
+                // Nombre de points affichés
+                // ============================================
+
+                pointsInfo.textContent =
+                    (
+                        ambient.length
+                        + setpoint.length
+                    )
+                    + " points affichés";
+
+
+            }
+
+            catch(error) {
+
+                console.error(
+                    "Erreur chargement historique :",
+                    error
+                );
+
+
+                pointsInfo.textContent =
+                    "Erreur pendant le chargement";
+            }
+
+            finally {
+
+                loading.style.display =
+                    "none";
+            }
+        }
+
+
+        // ====================================================
+        // Choix sonde depuis URL
+        //
+        // Exemple :
+        //
+        // /historique?source=11910489
+        // ====================================================
+
+        function selectSensorFromUrl() {
+
+            const params =
+                new URLSearchParams(
+                    window.location.search
+                );
+
+
+            const source =
+                params.get(
+                    "source"
+                );
+
+
+            if (!source) {
+
+                return;
+            }
+
+
+            const option =
+                sensorSelect.querySelector(
+                    'option[value="'
+                    + source
+                    + '"]'
+                );
+
+
+            if (option) {
+
+                sensorSelect.value =
+                    source;
+            }
+        }
+
+
+        // ====================================================
+        // Changement de sonde
+        // ====================================================
+
+        sensorSelect.addEventListener(
+            "change",
+            function() {
+
+                const url =
+                    new URL(
+                        window.location.href
+                    );
+
+
+                url.searchParams.set(
+                    "source",
+                    sensorSelect.value
+                );
+
+
+                window.history.replaceState(
+                    {},
+                    "",
+                    url
+                );
+
+
+                loadData();
+            }
+        );
+
+
+        // ====================================================
+        // Changement de période
+        // ====================================================
+
+        periodSelect.addEventListener(
+            "change",
+            function() {
+
+                updateResolutionInfo();
+
+                loadData();
+            }
+        );
+
+
+        // ====================================================
+        // Menu mobile
+        // ====================================================
+
+        function toggleMenu() {
+
+            const menu =
+                document.getElementById(
+                    "menu"
+                );
+
+
+            menu.classList.toggle(
+                "show"
+            );
+        }
+
+
+        function updateMenu() {
+
+            const menu =
+                document.getElementById(
+                    "menu"
+                );
+
+
+            const menuIcon =
+                document.querySelector(
+                    ".menu-icon"
+                );
+
+
+            if (
+                window.innerWidth
+                > 600
+            ) {
+
+                menu.classList.remove(
+                    "show"
+                );
+
+
+                menuIcon.style.display =
+                    "none";
+            }
+
+            else {
+
+                menuIcon.style.display =
+                    "block";
+            }
+        }
+
+
+        // ====================================================
+        // Initialisation
+        // ====================================================
+
+        window.addEventListener(
+            "load",
+            function() {
+
+                updateMenu();
+
+                selectSensorFromUrl();
+
+                updateResolutionInfo();
+
+                loadData();
+            }
+        );
+
+
+        window.addEventListener(
+            "resize",
+            updateMenu
+        );
+
+
+    </script>
+
+
+</body>
+
+</html>
