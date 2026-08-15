@@ -10,3 +10,10 @@ airsendwebservice = http://127.0.0.1:33863
 [temperature]
 database = temperatures.db
 
+
+[open_meteo]
+enabled = true
+name = Extérieur
+latitude = 48.8566
+longitude = 2.3522
+timezone = Europe/Paris

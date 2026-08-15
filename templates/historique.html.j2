@@ -305,6 +305,12 @@
         }
 
 
+        .outdoor {
+
+            color: #2e7d32;
+        }
+
+
         .current-updated {
 
             color: #999;
@@ -760,6 +766,41 @@
             </div>
 
 
+            {% if outdoor_enabled %}
+
+            <!-- Extérieure -->
+
+            <div class="current-value">
+
+                <div class="current-label">
+                    Température extérieure
+                </div>
+
+
+                <div
+                    id="outdoorValue"
+                    class="
+                        current-number
+                        outdoor
+                    "
+                >
+
+                    --
+
+                </div>
+
+
+                <div
+                    id="outdoorUpdated"
+                    class="current-updated"
+                >
+                </div>
+
+            </div>
+
+            {% endif %}
+
+
         </div>
 
 
@@ -846,6 +887,26 @@
             document.getElementById(
                 "setpointUpdated"
             );
+
+
+        const outdoorValue =
+            document.getElementById(
+                "outdoorValue"
+            );
+
+
+        const outdoorUpdated =
+            document.getElementById(
+                "outdoorUpdated"
+            );
+
+
+        const outdoorEnabled =
+            {{ outdoor_enabled | tojson }};
+
+
+        const outdoorName =
+            {{ outdoor_name | tojson }};
 
 
         const resolutionInfo =
@@ -952,6 +1013,40 @@
 
                                 stepped:
                                     "before"
+                            },
+
+
+                            // =================================
+                            // Température extérieure
+                            // =================================
+
+                            {
+                                label:
+                                    outdoorName,
+
+                                data:
+                                    [],
+
+                                borderColor:
+                                    "#2e7d32",
+
+                                backgroundColor:
+                                    "#2e7d32",
+
+                                borderWidth:
+                                    2,
+
+                                borderDash:
+                                    [6, 4],
+
+                                pointRadius:
+                                    1,
+
+                                pointHoverRadius:
+                                    5,
+
+                                tension:
+                                    0.15
                             }
 
                         ]
@@ -1614,9 +1709,22 @@
                 // Dernier état + historique
                 // --------------------------------------------
 
+                const outdoorHistoryRequest =
+                    outdoorEnabled
+                    ? fetch(
+                        "/api/open-meteo/history"
+                        + "?"
+                        + period.query
+                    )
+                    : Promise.resolve(
+                        null
+                    );
+
+
                 const [
                     currentResponse,
-                    historyResponse
+                    historyResponse,
+                    outdoorHistoryResponse
                 ] = await Promise.all(
 
                     [
@@ -1634,7 +1742,10 @@
                             )
                             + "&"
                             + period.query
-                        )
+                        ),
+
+
+                        outdoorHistoryRequest
 
                     ]
                 );
@@ -1643,6 +1754,10 @@
                 if (
                     !currentResponse.ok
                     || !historyResponse.ok
+                    || (
+                        outdoorHistoryResponse
+                        && !outdoorHistoryResponse.ok
+                    )
                 ) {
 
                     throw new Error(
@@ -1657,6 +1772,23 @@
 
                 const history =
                     await historyResponse.json();
+
+
+                const outdoorPayload =
+                    outdoorHistoryResponse
+                    ? await outdoorHistoryResponse.json()
+                    : {
+                        history: [],
+                        current: null
+                    };
+
+
+                const outdoorHistory =
+                    outdoorPayload.history || [];
+
+
+                const outdoorCurrent =
+                    outdoorPayload.current || null;
 
 
                 const current =
@@ -1704,6 +1836,39 @@
 
 
                 // ============================================
+                // Température extérieure actuelle
+                // ============================================
+
+                if (
+                    outdoorValue
+                    && outdoorCurrent
+                    && outdoorCurrent.value !== null
+                ) {
+
+                    outdoorValue.textContent =
+                        Number(
+                            outdoorCurrent.value
+                        ).toFixed(1)
+                        + " °C";
+
+
+                    outdoorUpdated.textContent =
+                        formatUpdatedDate(
+                            outdoorCurrent.timestamp
+                        );
+                }
+
+                else if (outdoorValue) {
+
+                    outdoorValue.textContent =
+                        "--";
+
+                    outdoorUpdated.textContent =
+                        "";
+                }
+
+
+                // ============================================
                 // Consigne actuelle
                 // ============================================
 
@@ -1742,6 +1907,8 @@
                 const ambient = [];
 
                 const setpoint = [];
+
+                const outdoor = [];
 
 
                 for (
@@ -1801,6 +1968,50 @@
                             }
                         );
                     }
+                }
+
+
+                for (
+                    const row
+                    of outdoorHistory
+                ) {
+
+                    if (
+                        row.type
+                        !== "ambient"
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const timestamp =
+                        new Date(
+                            row.timestamp
+                        ).getTime();
+
+
+                    if (
+                        Number.isNaN(
+                            timestamp
+                        )
+                    ) {
+
+                        continue;
+                    }
+
+
+                    outdoor.push(
+                        {
+                            x:
+                                timestamp,
+
+                            y:
+                                Number(
+                                    row.value
+                                )
+                        }
+                    );
                 }
 
 
@@ -1918,6 +2129,65 @@
 
 
                 // ============================================
+                // Ajouter le dernier point extérieur réel
+                // ============================================
+
+                if (
+                    outdoorEnabled
+                    && outdoorCurrent
+                    && outdoorCurrent.value !== null
+                    && outdoorCurrent.timestamp
+                ) {
+
+                    const outdoorTimestamp =
+                        new Date(
+                            outdoorCurrent.timestamp
+                        ).getTime();
+
+
+                    if (
+                        !Number.isNaN(
+                            outdoorTimestamp
+                        )
+                    ) {
+
+                        const lastOutdoor =
+                            outdoor.length
+                            ? outdoor[
+                                outdoor.length - 1
+                            ]
+                            : null;
+
+
+                        if (
+                            outdoorTimestamp
+                                >= rangeStart
+                            && outdoorTimestamp
+                                <= rangeEnd
+                            && (
+                                !lastOutdoor
+                                || outdoorTimestamp
+                                    > lastOutdoor.x
+                            )
+                        ) {
+
+                            outdoor.push(
+                                {
+                                    x:
+                                        outdoorTimestamp,
+
+                                    y:
+                                        Number(
+                                            outdoorCurrent.value
+                                        )
+                                }
+                            );
+                        }
+                    }
+                }
+
+
+                // ============================================
                 // Tri chronologique
                 // ============================================
 
@@ -1931,6 +2201,15 @@
 
 
                 setpoint.sort(
+                    (
+                        a,
+                        b
+                    ) =>
+                        a.x - b.x
+                );
+
+
+                outdoor.sort(
                     (
                         a,
                         b
@@ -1953,6 +2232,16 @@
                 ].data = setpoint;
 
 
+                chart.data.datasets[
+                    2
+                ].data = outdoor;
+
+
+                chart.data.datasets[
+                    2
+                ].hidden = !outdoorEnabled;
+
+
                 // ============================================
                 // Limites réelles du graphique
                 //
@@ -1972,7 +2261,8 @@
 
                 const allPoints = [
                     ...ambient,
-                    ...setpoint
+                    ...setpoint,
+                    ...outdoor
                 ];
 
 
@@ -2043,6 +2333,7 @@
                     (
                         ambient.length
                         + setpoint.length
+                        + outdoor.length
                     )
                     + " points affichés";
 
@@ -2271,3 +2562,4 @@
 </body>
 
 </html>
+

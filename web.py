@@ -7,6 +7,7 @@ import sqlite3
 import zlib
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import request, Response, jsonify, render_template
 from waitress import serve
 from iniparse import RawConfigParser
@@ -87,6 +88,90 @@ if inifile.has_section("temperature_sensors"):
         temperature_sensors[
             int(source)
         ] = name
+
+
+# ============================================================
+# Température extérieure Open-Meteo
+#
+# AUCUNE donnée Open-Meteo n'est stockée dans SQLite.
+# Les données sont demandées à Open-Meteo uniquement quand
+# l'utilisateur consulte ou modifie la période d'historique.
+# ============================================================
+
+OPEN_METEO_FORECAST_URL = (
+    "https://api.open-meteo.com/v1/forecast"
+)
+
+OPEN_METEO_ARCHIVE_URL = (
+    "https://archive-api.open-meteo.com/v1/archive"
+)
+
+
+
+if inifile.has_section("open_meteo"):
+
+    if inifile.has_option(
+        "open_meteo",
+        "enabled"
+    ):
+        OPEN_METEO_ENABLED = inifile.getboolean(
+            "open_meteo",
+            "enabled"
+        )
+
+    if inifile.has_option(
+        "open_meteo",
+        "name"
+    ):
+        OPEN_METEO_NAME = inifile.get(
+            "open_meteo",
+            "name"
+        )
+
+    if inifile.has_option(
+        "open_meteo",
+        "latitude"
+    ):
+        OPEN_METEO_LATITUDE = inifile.getfloat(
+            "open_meteo",
+            "latitude"
+        )
+
+    if inifile.has_option(
+        "open_meteo",
+        "longitude"
+    ):
+        OPEN_METEO_LONGITUDE = inifile.getfloat(
+            "open_meteo",
+            "longitude"
+        )
+
+    if inifile.has_option(
+        "open_meteo",
+        "timezone"
+    ):
+        OPEN_METEO_TIMEZONE = inifile.get(
+            "open_meteo",
+            "timezone"
+        )
+
+    if inifile.has_option(
+        "open_meteo",
+        "forecast_url"
+    ):
+        OPEN_METEO_FORECAST_URL = inifile.get(
+            "open_meteo",
+            "forecast_url"
+        ).rstrip("/")
+
+    if inifile.has_option(
+        "open_meteo",
+        "history_url"
+    ):
+        OPEN_METEO_ARCHIVE_URL = inifile.get(
+            "open_meteo",
+            "history_url"
+        ).rstrip("/")
 
 
 print("Sondes configurées :")
@@ -464,6 +549,343 @@ def save_temperature(
 
 
 # ============================================================
+# Open-Meteo
+#
+# Ces fonctions ne font qu'interroger l'API distante.
+# Elles n'appellent jamais save_temperature() et n'écrivent
+# donc jamais dans temperatures.db.
+# ============================================================
+
+def _open_meteo_now():
+
+    # Les dates envoyées à Open-Meteo doivent suivre le fuseau
+    # configuré et non le fuseau système du serveur.
+    try:
+        return datetime.now(
+            ZoneInfo(OPEN_METEO_TIMEZONE)
+        ).replace(tzinfo=None)
+    except ZoneInfoNotFoundError:
+        return datetime.now()
+
+
+def _parse_open_meteo_current(payload):
+
+    current = payload.get(
+        "current",
+        {}
+    )
+
+    value = current.get(
+        "temperature_2m"
+    )
+
+    if value is None:
+        return None
+
+    return {
+        "timestamp": current.get("time"),
+        "value": float(value)
+    }
+
+
+def _parse_open_meteo_history_points(
+    payload,
+    since_datetime,
+    until_datetime
+):
+
+    hourly = payload.get(
+        "hourly",
+        {}
+    )
+
+    times = hourly.get(
+        "time",
+        []
+    )
+
+    values = hourly.get(
+        "temperature_2m",
+        []
+    )
+
+    points = []
+
+    for timestamp, value in zip(
+        times,
+        values
+    ):
+
+        if value is None:
+            continue
+
+        try:
+            point_datetime = datetime.fromisoformat(
+                timestamp
+            )
+        except (TypeError, ValueError):
+            continue
+
+        if not (
+            since_datetime
+            <= point_datetime
+            < until_datetime
+        ):
+            continue
+
+        points.append(
+            {
+                "timestamp": timestamp,
+                "name": OPEN_METEO_NAME,
+                "type": "ambient",
+                "value": float(value)
+            }
+        )
+
+    return points
+
+
+def _reduce_open_meteo_history(
+    points,
+    bucket_seconds
+):
+
+    # L'API Open-Meteo fournit des valeurs horaires. Pour les
+    # très longues périodes, on applique la même logique de
+    # réduction que l'historique local afin de garder le graphe
+    # fluide.
+    if (
+        bucket_seconds is None
+        or bucket_seconds <= 3600
+    ):
+        return points
+
+    buckets = {}
+
+    for point in points:
+        point_datetime = datetime.fromisoformat(
+            point["timestamp"]
+        )
+
+        bucket_key = int(
+            point_datetime.timestamp()
+            // bucket_seconds
+        )
+
+        bucket = buckets.setdefault(
+            bucket_key,
+            {
+                "timestamp": point["timestamp"],
+                "values": []
+            }
+        )
+
+        bucket["values"].append(
+            point["value"]
+        )
+
+    reduced = []
+
+    for bucket_key in sorted(buckets):
+        bucket = buckets[bucket_key]
+
+        reduced.append(
+            {
+                "timestamp": bucket["timestamp"],
+                "name": OPEN_METEO_NAME,
+                "type": "ambient",
+                "value": sum(bucket["values"]) / len(bucket["values"])
+            }
+        )
+
+    return reduced
+
+
+def fetch_open_meteo_current():
+
+    response = requests.get(
+        OPEN_METEO_FORECAST_URL,
+        params={
+            "latitude": OPEN_METEO_LATITUDE,
+            "longitude": OPEN_METEO_LONGITUDE,
+            "current": "temperature_2m",
+            "timezone": OPEN_METEO_TIMEZONE
+        },
+        timeout=10
+    )
+
+    response.raise_for_status()
+
+    return _parse_open_meteo_current(
+        response.json()
+    )
+
+
+def fetch_open_meteo_history(
+    since_datetime,
+    until_datetime,
+    bucket_seconds=None
+):
+
+    now = _open_meteo_now()
+
+    effective_until = min(
+        until_datetime,
+        now
+    )
+
+    if effective_until <= since_datetime:
+        return [], None
+
+    # Le Forecast API sait fournir jusqu'à 92 jours passés.
+    # Pour les vues usuelles (6 h à 3 mois), on récupère donc
+    # historique + valeur courante en UN SEUL appel. Cela évite
+    # surtout d'envoyer la date du jour à l'Archive API, qui peut
+    # n'accepter que la veille selon l'heure de mise à jour.
+    days_back = max(
+        0,
+        (
+            now.date()
+            - since_datetime.date()
+        ).days
+    )
+
+    if days_back <= 92:
+
+        response = requests.get(
+            OPEN_METEO_FORECAST_URL,
+            params={
+                "latitude": OPEN_METEO_LATITUDE,
+                "longitude": OPEN_METEO_LONGITUDE,
+                "hourly": "temperature_2m",
+                "current": "temperature_2m",
+                "past_days": days_back,
+                "forecast_days": 1,
+                "timezone": OPEN_METEO_TIMEZONE
+            },
+            timeout=20
+        )
+
+        response.raise_for_status()
+
+        payload = response.json()
+
+        points = _parse_open_meteo_history_points(
+            payload,
+            since_datetime,
+            effective_until
+        )
+
+        return (
+            _reduce_open_meteo_history(
+                points,
+                bucket_seconds
+            ),
+            _parse_open_meteo_current(
+                payload
+            )
+        )
+
+    # Pour une longue période (par exemple 1 an), l'Archive API
+    # reste adaptée. Sa date de fin est volontairement plafonnée
+    # à hier : elle ne reçoit donc jamais la date du jour.
+    today_start = datetime.combine(
+        now.date(),
+        datetime.min.time()
+    )
+
+    archive_until = min(
+        effective_until,
+        today_start
+    )
+
+    points = []
+    current = None
+
+    if archive_until > since_datetime:
+
+        archive_end_inclusive = (
+            archive_until
+            - timedelta(microseconds=1)
+        )
+
+        response = requests.get(
+            OPEN_METEO_ARCHIVE_URL,
+            params={
+                "latitude": OPEN_METEO_LATITUDE,
+                "longitude": OPEN_METEO_LONGITUDE,
+                "start_date": since_datetime.date().isoformat(),
+                "end_date": archive_end_inclusive.date().isoformat(),
+                "hourly": "temperature_2m",
+                "timezone": OPEN_METEO_TIMEZONE
+            },
+            timeout=20
+        )
+
+        response.raise_for_status()
+
+        points.extend(
+            _parse_open_meteo_history_points(
+                response.json(),
+                since_datetime,
+                archive_until
+            )
+        )
+
+    # Si la période inclut aujourd'hui, le Forecast API complète
+    # uniquement la journée en cours et fournit aussi la valeur
+    # courante. Pour une plage entièrement passée, l'appel courant
+    # sera effectué ensuite par l'endpoint.
+    if effective_until > today_start:
+
+        recent_since = max(
+            since_datetime,
+            today_start
+        )
+
+        response = requests.get(
+            OPEN_METEO_FORECAST_URL,
+            params={
+                "latitude": OPEN_METEO_LATITUDE,
+                "longitude": OPEN_METEO_LONGITUDE,
+                "hourly": "temperature_2m",
+                "current": "temperature_2m",
+                "forecast_days": 1,
+                "timezone": OPEN_METEO_TIMEZONE
+            },
+            timeout=20
+        )
+
+        response.raise_for_status()
+
+        payload = response.json()
+
+        points.extend(
+            _parse_open_meteo_history_points(
+                payload,
+                recent_since,
+                effective_until
+            )
+        )
+
+        current = _parse_open_meteo_current(
+            payload
+        )
+
+    points.sort(
+        key=lambda point: point["timestamp"]
+    )
+
+    return (
+        _reduce_open_meteo_history(
+            points,
+            bucket_seconds
+        ),
+        current
+    )
+
+
+# ============================================================
 # Pages
 # ============================================================
 
@@ -584,7 +1006,9 @@ def historique():
 
     return render_template(
         "historique.html.j2",
-        sensors=sensors
+        sensors=sensors,
+        outdoor_enabled=OPEN_METEO_ENABLED,
+        outdoor_name=OPEN_METEO_NAME
     )
 
 
@@ -1184,6 +1608,150 @@ def get_history_bucket_seconds(hours):
     return max(
         6 * 60 * 60,
         calculated_bucket
+    )
+
+
+# ============================================================
+# API Open-Meteo à la demande
+#
+# Même syntaxe de période que /api/temperatures/history :
+#   ?hours=24
+# ou
+#   ?start=2026-08-01&end=2026-08-15
+#
+# Aucun résultat n'est écrit dans SQLite.
+# ============================================================
+
+@app.route(
+    "/api/open-meteo/history"
+)
+def api_open_meteo_history():
+
+    if not OPEN_METEO_ENABLED:
+        return jsonify(
+            {
+                "history": [],
+                "current": None
+            }
+        )
+
+    hours = request.args.get(
+        "hours",
+        default=24,
+        type=int
+    )
+
+    start_date = request.args.get(
+        "start"
+    )
+
+    end_date = request.args.get(
+        "end"
+    )
+
+    if start_date or end_date:
+
+        if not start_date or not end_date:
+            return jsonify(
+                {
+                    "error":
+                        "Les paramètres start et end sont requis ensemble."
+                }
+            ), 400
+
+        try:
+            since_datetime = datetime.strptime(
+                start_date,
+                "%Y-%m-%d"
+            )
+
+            end_day = datetime.strptime(
+                end_date,
+                "%Y-%m-%d"
+            )
+        except ValueError:
+            return jsonify(
+                {
+                    "error":
+                        "Format de date invalide. Utilisez AAAA-MM-JJ."
+                }
+            ), 400
+
+        if end_day < since_datetime:
+            return jsonify(
+                {
+                    "error":
+                        "La date de fin doit être postérieure ou égale à la date de début."
+                }
+            ), 400
+
+        until_datetime = (
+            end_day
+            + timedelta(days=1)
+        )
+
+        hours = max(
+            1,
+            int(
+                (
+                    until_datetime
+                    - since_datetime
+                ).total_seconds()
+                / 3600
+            )
+        )
+
+    else:
+        hours = max(
+            1,
+            hours or 24
+        )
+
+        until_datetime = _open_meteo_now()
+
+        since_datetime = (
+            until_datetime
+            - timedelta(hours=hours)
+        )
+
+    try:
+        history, current = fetch_open_meteo_history(
+            since_datetime,
+            until_datetime,
+            get_history_bucket_seconds(hours)
+        )
+
+    except Exception as exc:
+        print(
+            "Erreur historique Open-Meteo:",
+            exc
+        )
+
+        return jsonify(
+            {
+                "error":
+                    "Impossible de récupérer l'historique Open-Meteo."
+            }
+        ), 502
+
+    # Pour les périodes récentes, la valeur courante est déjà
+    # incluse dans le même appel Forecast que l'historique. Pour
+    # une ancienne plage entièrement passée, on la récupère ici.
+    if current is None:
+        try:
+            current = fetch_open_meteo_current()
+        except Exception as exc:
+            print(
+                "Erreur température actuelle Open-Meteo:",
+                exc
+            )
+            current = None
+
+    return jsonify(
+        {
+            "history": history,
+            "current": current
+        }
     )
 
 
